@@ -93,6 +93,7 @@ exports.updateProject = async (req, res) => {
       "endDate",
       "members",
       "createdByName",
+      "team",
     ];
 
     Object.keys(req.body).forEach((field) => {

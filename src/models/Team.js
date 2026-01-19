@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const projectSchema = new mongoose.Schema(
+const teamSchema = new mongoose.Schema(
   {
     name: {
       type: String,
@@ -8,56 +8,54 @@ const projectSchema = new mongoose.Schema(
       minlength: 3,
       trim: true,
     },
+
     description: {
       type: String,
       required: true,
       minlength: 10,
       trim: true,
     },
-    key: {
+
+    teamKey: {
       type: String,
+      required: true,
       uppercase: true,
       trim: true,
+      unique: true, // har team ka unique key
     },
-    visibility: {
-      type: String,
-      enum: ["Public", "Private"],
-      default: "Public",
-    },
+
     status: {
       type: String,
-      enum: ["Active", "Completed", "Archived"],
+      enum: ["Active", "Archived"],
       default: "Active",
     },
-    startDate: {
-      type: Date,
-      required: true,
-    },
-    endDate: {
-      type: Date,
-      required: true,
-    },
+
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
+
     createdByName: {
       type: String,
       required: true,
     },
-    team: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Team",
-    },
+
     members: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
       },
     ],
+
+    projects: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Project",
+      },
+    ],
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model("Project", projectSchema);
+module.exports = mongoose.model("Team", teamSchema);
