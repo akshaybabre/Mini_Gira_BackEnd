@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const Company = require("../models/Company");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
@@ -7,29 +8,54 @@ const jwt = require("jsonwebtoken");
  */
 exports.registerUser = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, companyName, role } = req.body;
 
-    // validation
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !companyName) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    // check existing user
+    // Check existing user
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    // hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    // Check company (case-insensitive)
+    let company = await Company.findOne({
+      name: companyName.toLowerCase(),
+    });
 
-    // create user
+    let finalRole;
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    if (!company) {
+      // Company does not exist → create new
+      company = await Company.create({
+        name: companyName.toLowerCase(),
+      });
+
+      finalRole = "admin";
+    } else {
+      // Company exists → force member
+      finalRole = "member";
+    }
+
+    // Create user
     const user = await User.create({
       name,
       email,
       password: hashedPassword,
+      role: finalRole,
+      company: company._id,
     });
+
+    // If new company, set createdBy
+    if (finalRole === "admin") {
+      company.createdBy = user._id;
+      await company.save();
+    }
 
     res.status(201).json({
       message: "User registered successfully",
@@ -37,6 +63,8 @@ exports.registerUser = async (req, res) => {
         id: user._id,
         name: user.name,
         email: user.email,
+        role: user.role,
+        company: company.name,
       },
     });
   } catch (error) {
@@ -51,47 +79,39 @@ exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // validation
     if (!email || !password) {
       return res.status(400).json({ message: "Email & password required" });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).populate("company");
+
     if (!user) {
       return res.status(400).json({ message: "EMAIL_NOT_FOUND" });
     }
 
-    // compare password
+    if (!user.isActive) {
+      return res.status(403).json({ message: "User account is disabled" });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
+
     if (!isMatch) {
       return res.status(400).json({ message: "PASSWORD_INCORRECT" });
     }
 
-    // generate token
     const token = jwt.sign(
       { id: user._id },
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
+
     res
       .cookie("token", token, {
-        httpOnly: true,     
-        secure: false,       
+        httpOnly: true,
+        secure: false,
         sameSite: "lax",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       })
-      .cookie(
-        "user",
-        JSON.stringify({
-          id: user._id,
-          name: user.name,
-          email: user.email,
-        }),
-        {
-          httpOnly: false,   // frontend read karega
-          maxAge: 7 * 24 * 60 * 60 * 1000,
-        }
-      )
       .json({
         message: "Login successful",
         token,
@@ -99,6 +119,9 @@ exports.loginUser = async (req, res) => {
           id: user._id,
           name: user.name,
           email: user.email,
+          role: user.role,
+          company: user.company.name,
+          companyId: user.company._id,
         },
       });
   } catch (error) {
@@ -106,9 +129,9 @@ exports.loginUser = async (req, res) => {
   }
 };
 
+/**
+ * LOGOUT
+ */
 exports.logoutUser = (req, res) => {
-  res
-    .clearCookie("token")
-    .clearCookie("user")
-    .json({ message: "Logged out successfully" });
+  res.clearCookie("token").json({ message: "Logged out successfully" });
 };

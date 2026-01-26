@@ -5,6 +5,8 @@ const testRoutes = require("./routes/testRoutes");
 const cookieParser = require("cookie-parser");
 const projectRoutes = require("./routes/projectRoutes");
 const teamRoutes = require("./routes/teamRoutes");
+const companyRoutes = require("./routes/companyRoutes");
+
 
 
 const app = express();
@@ -18,9 +20,11 @@ app.use(
 app.use(express.json());
 
 app.use("/api/auth", authRoutes);
+app.use("/api/company", companyRoutes);
 app.use("/api/test", testRoutes);
 
 app.use("/api/projects", projectRoutes);
+
 
 app.use("/api/teams", teamRoutes);
 
