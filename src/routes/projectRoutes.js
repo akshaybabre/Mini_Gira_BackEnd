@@ -7,10 +7,11 @@ const {
   deleteProject,
   getUserProjects, 
 } = require("../controllers/projectController");
+router.use(authMiddleware);
 
-router.post("/create", authMiddleware, createProject);
-router.get("/getallprojects", authMiddleware, getUserProjects);
-router.put("/update/:id", authMiddleware, updateProject);
-router.delete("/delete/:id", authMiddleware, deleteProject);
+router.post("/create", createProject);
+router.get("/getallprojects", getUserProjects);
+router.put("/update/:id", updateProject);
+router.delete("/delete/:id", deleteProject);
 
 module.exports = router;

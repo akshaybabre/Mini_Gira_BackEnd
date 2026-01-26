@@ -3,7 +3,7 @@ const Project = require("../models/Project");
 /* ---------------- CREATE PROJECT ---------------- */
 exports.createProject = async (req, res) => {
   try {
-    const { name, description, key, visibility, status, startDate, endDate, members, createdByName } = req.body;
+    const { name, description, key, visibility, status, startDate, endDate, members } = req.body;
 
     // Validation
     if (!name || name.length < 3) {
@@ -36,7 +36,7 @@ exports.createProject = async (req, res) => {
       startDate,
       endDate,
       createdBy: req.user._id,
-      createdByName: createdByName || req.user.name,
+      createdByName: req.user.name,
       members,
     });
 
@@ -83,6 +83,18 @@ exports.updateProject = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
+    // 🔥 Duplicate key check (only if key is being changed)
+    if (req.body.key && req.body.key !== project.key) {
+      const existing = await Project.findOne({
+        key: req.body.key,
+        createdBy: req.user._id, // user-wise unique
+      });
+
+      if (existing) {
+        return res.status(400).json({ message: "Project key already exists" });
+      }
+    }
+
     const allowedUpdates = [
       "name",
       "description",
@@ -104,7 +116,7 @@ exports.updateProject = async (req, res) => {
 
     await project.save();
 
-    return res.json({ message: "Project updated", project });
+    return res.json({ message: "Project updated successfully", project });
 
   } catch (error) {
     console.error("Update Project Error:", error);
