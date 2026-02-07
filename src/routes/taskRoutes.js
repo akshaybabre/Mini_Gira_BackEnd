@@ -9,6 +9,7 @@ const {
   updateTask,
   updateTaskStatus,
   deleteTask,
+  getCompanyMembers
 } = require("../controllers/taskController");
 
 // protect all task routes
@@ -31,5 +32,7 @@ router.get("/gettaskbyid/:id", getTaskById);
  * MEMBER ROUTES
  */
 router.patch("/updatetaskstatus/:id/status", updateTaskStatus);
+
+router.get("/company-members", getCompanyMembers);
 
 module.exports = router;

@@ -3,19 +3,31 @@ const mongoose = require("mongoose");
 const teamSchema = new mongoose.Schema(
   {
     company: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Company",
-      required: true,
-      index: true,
+      id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Company",
+        required: true,
+        index: true,
+      },
+      name: {
+        type: String,
+        required: true,
+        trim: true,
+      },
     },
-
     project: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Project",
-      required: true,
-      index: true,
+      id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Project",
+        required: true,
+        index: true,
+      },
+      name: {
+        type: String,
+        required: true,
+        trim: true,
+      },
     },
-
     name: {
       type: String,
       required: true,
@@ -51,17 +63,22 @@ const teamSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
-
     createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true, // admin
+      id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+      },
+      name: {
+        type: String,
+        required: true,
+      },
     },
   },
   { timestamps: true }
 );
 
 // unique team key per project
-teamSchema.index({ project: 1, key: 1 }, { unique: true });
+teamSchema.index({ "project.id": 1, key: 1 }, { unique: true });
 
 module.exports = mongoose.model("Team", teamSchema);

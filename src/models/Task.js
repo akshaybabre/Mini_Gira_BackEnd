@@ -3,24 +3,45 @@ const mongoose = require("mongoose");
 const taskSchema = new mongoose.Schema(
   {
     company: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Company",
-      required: true,
-      index: true,
+      id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Company",
+        required: true,
+        index: true,
+      },
+      name: {
+        type: String,
+        required: true,
+        trim: true,
+      },
     },
 
     project: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Project",
-      required: true,
-      index: true,
+      id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Project",
+        required: true,
+        index: true,
+      },
+      name: {
+        type: String,
+        required: true,
+        trim: true,
+      },
     },
 
     team: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Team",
-      required: true,
-      index: true,
+      id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Team",
+        required: true,
+        index: true,
+      },
+      name: {
+        type: String,
+        required: true,
+        trim: true,
+      },
     },
 
     title: {
@@ -52,25 +73,44 @@ const taskSchema = new mongoose.Schema(
     },
 
     assignedTo: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true, // single user only
-      index: true,
+      id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+        index: true,
+      },
+      name: {
+        type: String,
+        required: true,
+      },
     },
 
     sprint: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Sprint",
-      default: null, // optional
+      default: null,
     },
 
     createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true, // admin
+      id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+      },
+      name: {
+        type: String,
+        required: true,
+      },
     },
   },
   { timestamps: true }
 );
+
+/* ===== INDEXES ===== */
+taskSchema.index({ "company.id": 1 });
+taskSchema.index({ "project.id": 1 });
+taskSchema.index({ "team.id": 1 });
+taskSchema.index({ status: 1 });
+taskSchema.index({ priority: 1 });
 
 module.exports = mongoose.model("Task", taskSchema);
