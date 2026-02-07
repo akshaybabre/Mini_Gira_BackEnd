@@ -6,6 +6,8 @@ const cookieParser = require("cookie-parser");
 const projectRoutes = require("./routes/projectRoutes");
 const teamRoutes = require("./routes/teamRoutes");
 const companyRoutes = require("./routes/companyRoutes");
+const taskRoutes = require("./routes/taskRoutes")
+const sprintRoutes = require("./routes/sprintRoutes")
 
 
 
@@ -24,9 +26,10 @@ app.use("/api/company", companyRoutes);
 app.use("/api/test", testRoutes);
 
 app.use("/api/projects", projectRoutes);
-
-
 app.use("/api/teams", teamRoutes);
+app.use("/api/task", taskRoutes);
+app.use("/api/sprint", sprintRoutes);
+
 
 
 app.get("/", (req, res) => {

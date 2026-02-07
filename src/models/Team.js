@@ -2,43 +2,47 @@ const mongoose = require("mongoose");
 
 const teamSchema = new mongoose.Schema(
   {
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Company",
+      required: true,
+      index: true,
+    },
+
+    project: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
+      required: true,
+      index: true,
+    },
+
     name: {
       type: String,
       required: true,
-      minlength: 3,
       trim: true,
+      minlength: 2,
+      maxlength: 100,
     },
 
     description: {
       type: String,
-      required: true,
-      minlength: 10,
       trim: true,
+      maxlength: 500,
     },
 
-    teamKey: {
+    key: {
       type: String,
       required: true,
       uppercase: true,
       trim: true,
-      unique: true, // har team ka unique key
+      index: true, // ex: FE-TEAM, API-TEAM
     },
 
     status: {
       type: String,
       enum: ["Active", "Archived"],
       default: "Active",
-    },
-
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-
-    createdByName: {
-      type: String,
-      required: true,
+      index: true,
     },
 
     members: [
@@ -48,14 +52,16 @@ const teamSchema = new mongoose.Schema(
       },
     ],
 
-    projects: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Project",
-      },
-    ],
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true, // admin
+    },
   },
   { timestamps: true }
 );
+
+// unique team key per project
+teamSchema.index({ project: 1, key: 1 }, { unique: true });
 
 module.exports = mongoose.model("Team", teamSchema);

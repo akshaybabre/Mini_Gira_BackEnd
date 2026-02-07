@@ -2,40 +2,30 @@ const express = require("express");
 const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
-
 const {
   createTeam,
   getMyTeams,
   getTeamById,
   updateTeam,
   deleteTeam,
-  getTeamProjects,
-} = require("../controllers/TeamsController");
+} = require("../controllers/teamsController");
 
+// protect all team routes
 router.use(authMiddleware);
 
+// Create team
+router.post("/createteam", createTeam);
 
-/* =========================
-   TEAM ROUTES
-========================= */
+// Get my teams (admin/member)
+router.get("/getteams", getMyTeams);
 
-// Create Team
-router.post("/create", createTeam);
-
-// Get all teams of logged in user
-router.get("/myteams", getMyTeams);
-
-// Get single team
-router.get("/:id", getTeamById);
+// Get team by id
+router.get("/getteamsbyid/:id", getTeamById);
 
 // Update team
-router.put("/update/:id", updateTeam);
+router.put("/updateteam/:id", updateTeam);
 
 // Delete team
-router.delete("/delete/:id", deleteTeam);
-
-// Get all projects assigned to this team
-router.get("/:id/projects", getTeamProjects);
-
+router.delete("/deleteteam/:id", deleteTeam);
 
 module.exports = router;

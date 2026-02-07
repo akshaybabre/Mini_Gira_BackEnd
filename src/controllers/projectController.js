@@ -1,147 +1,177 @@
 const Project = require("../models/Project");
 
-/* ---------------- CREATE PROJECT ---------------- */
+/**
+ * @desc   Create Project
+ * @route  POST /api/projects
+ * @access Admin
+ */
 exports.createProject = async (req, res) => {
   try {
-    const { name, description, key, visibility, status, startDate, endDate, members } = req.body;
+    const { name, description, key, members } = req.body;
 
-    // Validation
-    if (!name || name.length < 3) {
-      return res.status(400).json({ message: "Project name must be at least 3 characters" });
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
     }
 
-    if (!description || description.length < 10) {
-      return res.status(400).json({ message: "Description must be at least 10 characters" });
+    if (!name || !key) {
+      return res.status(400).json({ message: "Name and key are required" });
     }
 
-    if (!startDate || !endDate) {
-      return res.status(400).json({ message: "Start and End date are required" });
-    }
+    // check unique key per company
+    const existingProject = await Project.findOne({
+      company: req.user.company,
+      key: key.toUpperCase(),
+    });
 
-    if (new Date(endDate) < new Date(startDate)) {
-      return res.status(400).json({ message: "End date must be after start date" });
-    }
-
-    if (key) {
-      const existing = await Project.findOne({ key });
-      if (existing) return res.status(400).json({ message: "Project key already exists" });
+    if (existingProject) {
+      return res
+        .status(409)
+        .json({ message: "Project key already exists in this company" });
     }
 
     const project = await Project.create({
+      company: req.user.company,
       name,
       description,
-      key,
-      visibility,
-      status,
-      startDate,
-      endDate,
+      key: key.toUpperCase(),
+      members: members || [],
       createdBy: req.user._id,
-      createdByName: req.user.name,
-      members,
     });
 
-    return res.status(201).json({
+    res.status(201).json({
       message: "Project created successfully",
       project,
     });
-
   } catch (error) {
-    console.error("Create Project Error:", error);
-    return res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-/* ---------------- GET USER PROJECTS ---------------- */
-exports.getUserProjects = async (req, res) => {
+/**
+ * @desc   Get All Projects (Company scoped)
+ * @route  GET /api/projects
+ * @access Admin
+ */
+exports.getAllProjects = async (req, res) => {
   try {
-    const userId = req.user._id;
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
 
-    const projects = await Project.find({ createdBy: userId });
+    const projects = await Project.find({
+      company: req.user.company,
+    }).sort({ createdAt: -1 });
 
-    return res.status(200).json({
-      count: projects.length,
-      projects,
-    });
-
+    res.status(200).json({ count: projects.length, projects });
   } catch (error) {
-    console.error("Get User Projects Error:", error);
-    return res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
+/**
+ * @desc   Get Projects Created By Logged-in Admin
+ * @route  GET /api/projects/my
+ * @access Admin
+ */
+exports.getMyProjects = async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
 
+    const projects = await Project.find({
+      company: req.user.company,
+      createdBy: req.user._id,
+    }).sort({ createdAt: -1 });
 
-/* ---------------- UPDATE PROJECT ---------------- */
+    res.status(200).json({ count: projects.length, projects });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+/**
+ * @desc   Update Project
+ * @route  PUT /api/projects/:id
+ * @access Admin (Creator only)
+ */
 exports.updateProject = async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const { id } = req.params;
 
-    if (!project) return res.status(404).json({ message: "Project not found" });
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
 
-    // Only creator can update
+    const project = await Project.findById(id);
+
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    // company validation
+    if (project.company.toString() !== req.user.company.toString()) {
+      return res.status(403).json({ message: "Invalid company access" });
+    }
+
+    // creator validation
     if (project.createdBy.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Unauthorized" });
+      return res
+        .status(403)
+        .json({ message: "Only project creator can update this project" });
     }
 
-    // 🔥 Duplicate key check (only if key is being changed)
-    if (req.body.key && req.body.key !== project.key) {
-      const existing = await Project.findOne({
-        key: req.body.key,
-        createdBy: req.user._id, // user-wise unique
-      });
-
-      if (existing) {
-        return res.status(400).json({ message: "Project key already exists" });
-      }
-    }
-
-    const allowedUpdates = [
-      "name",
-      "description",
-      "key",
-      "visibility",
-      "status",
-      "startDate",
-      "endDate",
-      "members",
-      "createdByName",
-      "team",
-    ];
-
-    Object.keys(req.body).forEach((field) => {
-      if (allowedUpdates.includes(field)) {
+    const allowedUpdates = ["name", "description", "status", "members"];
+    allowedUpdates.forEach((field) => {
+      if (req.body[field] !== undefined) {
         project[field] = req.body[field];
       }
     });
 
     await project.save();
 
-    return res.json({ message: "Project updated successfully", project });
-
+    res.status(200).json({
+      message: "Project updated successfully",
+      project,
+    });
   } catch (error) {
-    console.error("Update Project Error:", error);
-    return res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-
-/* ---------------- DELETE PROJECT ---------------- */
+/**
+ * @desc   Delete Project
+ * @route  DELETE /api/projects/:id
+ * @access Admin (Creator only)
+ */
 exports.deleteProject = async (req, res) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const { id } = req.params;
 
-    if (!project) return res.status(404).json({ message: "Project not found" });
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied" });
+    }
+
+    const project = await Project.findById(id);
+
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    if (project.company.toString() !== req.user.company.toString()) {
+      return res.status(403).json({ message: "Invalid company access" });
+    }
 
     if (project.createdBy.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Unauthorized" });
+      return res
+        .status(403)
+        .json({ message: "Only project creator can delete this project" });
     }
 
     await project.deleteOne();
 
-    return res.json({ message: "Project deleted successfully" });
-
+    res.status(200).json({ message: "Project deleted successfully" });
   } catch (error) {
-    console.error("Delete Project Error:", error);
-    return res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
