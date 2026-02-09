@@ -3,17 +3,31 @@ const mongoose = require("mongoose");
 const sprintSchema = new mongoose.Schema(
   {
     company: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Company",
-      required: true,
-      index: true,
+      id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Company",
+        required: true,
+        index: true,
+      },
+      name: {
+        type: String,
+        required: true,
+        trim: true,
+      },
     },
 
     project: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Project",
-      required: true,
-      index: true,
+      id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Project",
+        required: true,
+        index: true,
+      },
+      name: {
+        type: String,
+        required: true,
+        trim: true,
+      },
     },
 
     name: {
@@ -21,13 +35,13 @@ const sprintSchema = new mongoose.Schema(
       required: true,
       trim: true,
       minlength: 3,
-      maxlength: 100, // e.g. Sprint 1, Sprint Q1-Week2
+      maxlength: 100,
     },
 
     goal: {
       type: String,
       trim: true,
-      maxlength: 500, // sprint objective
+      maxlength: 500,
     },
 
     startDate: {
@@ -50,24 +64,24 @@ const sprintSchema = new mongoose.Schema(
     },
 
     createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true, // admin
+      id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+      },
+      name: {
+        type: String,
+        required: true,
+      },
     },
   },
   { timestamps: true }
 );
 
-/**
- * Business constraint:
- * Only one ACTIVE sprint per project
- */
+/* only one active sprint per project */
 sprintSchema.index(
-  { project: 1, status: 1 },
-  {
-    unique: true,
-    partialFilterExpression: { status: "Active" },
-  }
+  { "project.id": 1, status: 1 },
+  { unique: true, partialFilterExpression: { status: "Active" } }
 );
 
 module.exports = mongoose.model("Sprint", sprintSchema);

@@ -2,11 +2,9 @@ const Sprint = require("../models/Sprint");
 const Project = require("../models/Project");
 const Task = require("../models/Task");
 
-/**
- * =========================
- * ADMIN: CREATE SPRINT
- * =========================
- */
+/* =====================================================
+   ADMIN: CREATE SPRINT
+===================================================== */
 exports.createSprint = async (req, res) => {
   try {
     if (req.user.role !== "admin") {
@@ -27,21 +25,33 @@ exports.createSprint = async (req, res) => {
         .json({ message: "endDate must be after startDate" });
     }
 
-    const project = await Project.findById(projectId);
-    if (!project) return res.status(404).json({ message: "Project not found" });
+    // 🔹 project fetch (company + name mil jayega)
+    const project = await Project.findOne({
+      _id: projectId,
+      company: req.user.company,
+    }).populate("company", "name");
 
-    if (project.company.toString() !== req.user.company.toString()) {
-      return res.status(403).json({ message: "Invalid company access" });
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
     }
 
     const sprint = await Sprint.create({
-      company: req.user.company,
-      project: projectId,
-      name,
-      goal,
+      company: {
+        id: project.company._id,
+        name: project.company.name, // ✅ FIX
+      },
+      project: {
+        id: project._id,
+        name: project.name, // ✅ already working
+      },
+      name: name.trim(),
+      goal: goal?.trim(),
       startDate,
       endDate,
-      createdBy: req.user._id,
+      createdBy: {
+        id: req.user._id,
+        name: req.user.name,
+      },
     });
 
     res.status(201).json({
@@ -49,94 +59,71 @@ exports.createSprint = async (req, res) => {
       sprint,
     });
   } catch (error) {
-    if (error.code === 11000) {
-      return res
-        .status(409)
-        .json({ message: "Only one active sprint allowed per project" });
-    }
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-/**
- * =========================
- * GET SPRINTS (PROJECT-WISE)
- * =========================
- */
+/* =====================================================
+   GET SPRINTS (PROJECT WISE)
+===================================================== */
 exports.getSprints = async (req, res) => {
   try {
     const { projectId } = req.query;
 
-    let query = { company: req.user.company };
-
-    if (req.user.role === "admin") {
-      if (!projectId) {
-        return res
-          .status(400)
-          .json({ message: "projectId is required" });
-      }
-      query.project = projectId;
-    } else {
-      // member: only projects where member exists
-      query.project = { $in: req.user.projects || [] };
+    if (!projectId) {
+      return res.status(400).json({ message: "projectId is required" });
     }
 
-    const sprints = await Sprint.find(query).sort({ startDate: -1 });
+    const sprints = await Sprint.find({
+      "company.id": req.user.company,
+      "project.id": projectId,
+    }).sort({ startDate: -1 });
 
-    res.status(200).json({ count: sprints.length, sprints });
+    res.status(200).json({
+      count: sprints.length,
+      sprints,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-/**
- * =========================
- * GET SPRINT BY ID
- * =========================
- */
+/* =====================================================
+   GET SPRINT BY ID
+===================================================== */
 exports.getSprintById = async (req, res) => {
   try {
-    const sprint = await Sprint.findById(req.params.id);
-    if (!sprint) return res.status(404).json({ message: "Sprint not found" });
+    const sprint = await Sprint.findOne({
+      _id: req.params.id,
+      "company.id": req.user.company,
+    });
 
-    if (sprint.company.toString() !== req.user.company.toString()) {
-      return res.status(403).json({ message: "Invalid company access" });
-    }
-
-    // member access: must belong to project
-    if (req.user.role === "member") {
-      const project = await Project.findById(sprint.project);
-      if (
-        !project.members.map(String).includes(req.user._id.toString())
-      ) {
-        return res.status(403).json({ message: "Access denied" });
-      }
+    if (!sprint) {
+      return res.status(404).json({ message: "Sprint not found" });
     }
 
     res.status(200).json(sprint);
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-/**
- * =========================
- * ADMIN: UPDATE SPRINT
- * =========================
- */
+/* =====================================================
+   ADMIN: UPDATE SPRINT
+===================================================== */
 exports.updateSprint = async (req, res) => {
   try {
     if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    const sprint = await Sprint.findById(req.params.id);
-    if (!sprint) return res.status(404).json({ message: "Sprint not found" });
+    const sprint = await Sprint.findOne({
+      _id: req.params.id,
+      "company.id": req.user.company,
+    });
 
-    if (sprint.createdBy.toString() !== req.user._id.toString()) {
-      return res
-        .status(403)
-        .json({ message: "Only creator admin can update this sprint" });
+    if (!sprint) {
+      return res.status(404).json({ message: "Sprint not found" });
     }
 
     if (sprint.status === "Completed") {
@@ -155,19 +142,22 @@ exports.updateSprint = async (req, res) => {
 
     if (status === "Active") {
       const activeSprint = await Sprint.findOne({
-        project: sprint.project,
+        "project.id": sprint.project.id,
         status: "Active",
       });
 
-      if (activeSprint && activeSprint._id.toString() !== sprint._id.toString()) {
+      if (
+        activeSprint &&
+        activeSprint._id.toString() !== sprint._id.toString()
+      ) {
         return res.status(400).json({
           message: "Complete the existing active sprint first",
         });
       }
     }
 
-    if (name !== undefined) sprint.name = name;
-    if (goal !== undefined) sprint.goal = goal;
+    if (name !== undefined) sprint.name = name.trim();
+    if (goal !== undefined) sprint.goal = goal.trim();
     if (startDate !== undefined) sprint.startDate = startDate;
     if (endDate !== undefined) sprint.endDate = endDate;
     if (status !== undefined) sprint.status = status;
@@ -179,39 +169,27 @@ exports.updateSprint = async (req, res) => {
       sprint,
     });
   } catch (error) {
-    if (error.code === 11000) {
-      return res
-        .status(409)
-        .json({ message: "Only one active sprint allowed per project" });
-    }
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-/**
- * =========================
- * ADMIN: COMPLETE SPRINT
- * =========================
- */
+/* =====================================================
+   ADMIN: COMPLETE SPRINT
+===================================================== */
 exports.completeSprint = async (req, res) => {
   try {
     if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    const sprint = await Sprint.findById(req.params.id);
-    if (!sprint) return res.status(404).json({ message: "Sprint not found" });
+    const sprint = await Sprint.findOne({
+      _id: req.params.id,
+      "company.id": req.user.company,
+      status: "Active",
+    });
 
-    if (sprint.createdBy.toString() !== req.user._id.toString()) {
-      return res
-        .status(403)
-        .json({ message: "Only creator admin can complete this sprint" });
-    }
-
-    if (sprint.status !== "Active") {
-      return res
-        .status(400)
-        .json({ message: "Only active sprint can be completed" });
+    if (!sprint) {
+      return res.status(404).json({ message: "Active sprint not found" });
     }
 
     sprint.status = "Completed";
@@ -222,32 +200,30 @@ exports.completeSprint = async (req, res) => {
       sprint,
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-/**
- * =========================
- * ADMIN: DELETE SPRINT
- * =========================
- */
+/* =====================================================
+   ADMIN: DELETE SPRINT
+===================================================== */
 exports.deleteSprint = async (req, res) => {
   try {
     if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    const sprint = await Sprint.findById(req.params.id);
-    if (!sprint) return res.status(404).json({ message: "Sprint not found" });
+    const sprint = await Sprint.findOne({
+      _id: req.params.id,
+      "company.id": req.user.company,
+    });
 
-    if (sprint.createdBy.toString() !== req.user._id.toString()) {
-      return res
-        .status(403)
-        .json({ message: "Only creator admin can delete this sprint" });
+    if (!sprint) {
+      return res.status(404).json({ message: "Sprint not found" });
     }
 
-    const tasksCount = await Task.countDocuments({ sprint: sprint._id });
-    if (tasksCount > 0) {
+    const taskCount = await Task.countDocuments({ sprint: sprint._id });
+    if (taskCount > 0) {
       return res.status(400).json({
         message: "Sprint cannot be deleted as tasks are assigned",
       });
@@ -255,8 +231,10 @@ exports.deleteSprint = async (req, res) => {
 
     await sprint.deleteOne();
 
-    res.status(200).json({ message: "Sprint deleted successfully" });
+    res.status(200).json({
+      message: "Sprint deleted successfully",
+    });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
